@@ -1,55 +1,36 @@
-const Booking = require('../models/Booking');
 const express = require('express');
 const router = express.Router();
+const Booking = require('../models/Booking');
 
-
-router.get('/', (req, res) => {
-  res.json({ message: 'GET request to /api/booking working!' });
-});
-
-
+// POST route - Save a new booking
 router.post('/', async (req, res) => {
-  console.log('POST /api/booking route hit');
   try {
-    const newBooking = new Booking(req.body);
-    const savedBooking = await newBooking.save();
-    res.status(201).json(savedBooking);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+    const { customerName, serviceType, bikeModel, appointmentDate } = req.body;
+
+    const newBooking = new Booking({
+      customerName,
+      serviceType,
+      bikeModel,
+      appointmentDate,
+    });
+
+    await newBooking.save();
+    res.status(201).json({ message: 'Booking successful!' });
+  } catch (error) {
+    console.error('Error saving booking:', error.message);
+    res.status(500).json({ error: 'Server error. Try again later.' });
   }
 });
 
 
-router.put('/:id', async (req, res) => {
+// ✅ GET route - Fetch all bookings
+router.get('/', async (req, res) => {
   try {
-    const updatedBooking = await Booking.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
-
-    if (!updatedBooking) {
-      return res.status(404).json({ message: 'Booking not found' });
-    }
-
-    res.json(updatedBooking);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-
-router.delete('/:id', async (req, res) => {
-  try {
-    const deletedBooking = await Booking.findByIdAndDelete(req.params.id);
-
-    if (!deletedBooking) {
-      return res.status(404).json({ message: 'Booking not found' });
-    }
-
-    res.json({ message: 'Booking deleted successfully' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const bookings = await Booking.find().sort({ createdAt: -1 });
+    res.status(200).json(bookings);
+  } catch (error) {
+    console.error('Error fetching bookings:', error.message);
+    res.status(500).json({ error: 'Server error while fetching bookings' });
   }
 });
 
