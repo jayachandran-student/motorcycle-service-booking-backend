@@ -1,34 +1,92 @@
 import express from "express";
 import Booking from "../models/Booking.js";
-import { protect } from "../middleware/authMiddleware.js";
+import Motorcycle from "../models/Motorcycle.js";
+import { auth } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// Create a new booking (Protected)
-router.post("/create", protect, async (req, res) => {
+/** Create a booking (initially "pending") */
+router.post("/", auth("taker"), async (req, res) => {
   try {
-    const { vehicle, date } = req.body;
+    const { motorcycleId, startDate, endDate, totalPrice, orderId } = req.body;
 
-    const newBooking = new Booking({
-      vehicle,
-      date,
-      user: req.user.id, // comes from JWT middleware
+    const mc = await Motorcycle.findById(motorcycleId);
+    if (!mc) return res.status(404).json({ message: "Motorcycle not found" });
+
+    const booking = await Booking.create({
+      user: req.user.id,
+      motorcycle: mc._id,
+      startDate,
+      endDate,
+      totalPrice,
+      orderId,
+      status: "pending",
     });
 
-    await newBooking.save();
-    res.status(201).json(newBooking);
-  } catch (err) {
-    res.status(500).json({ message: "Error creating booking", error: err.message });
+    res.json(booking);
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Unable to create booking" });
   }
 });
 
-// Get all bookings for logged-in user (Protected)
-router.get("/my-bookings", protect, async (req, res) => {
+/** Get current user's bookings (taker) */
+router.get("/mine", auth("taker"), async (req, res) => {
   try {
-    const bookings = await Booking.find({ user: req.user.id });
-    res.json(bookings);
-  } catch (err) {
-    res.status(500).json({ message: "Error fetching bookings", error: err.message });
+    const list = await Booking.find({ user: req.user.id }).populate("motorcycle");
+    res.json(list);
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Unable to fetch bookings" });
+  }
+});
+
+/** Update (e.g., mark failed) */
+router.put("/:id", auth("taker"), async (req, res) => {
+  try {
+    const { status } = req.body || {};
+    const b = await Booking.findOne({ _id: req.params.id, user: req.user.id });
+    if (!b) return res.status(404).json({ message: "Booking not found" });
+
+    if (status) b.status = status;
+    await b.save();
+    res.json(b);
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Unable to update booking" });
+  }
+});
+
+/** Soft-cancel (keep history for analytics) */
+router.delete("/:id", auth("taker"), async (req, res) => {
+  try {
+    const b = await Booking.findOne({ _id: req.params.id, user: req.user.id });
+    if (!b) return res.status(404).json({ message: "Booking not found" });
+
+    if (b.status === "confirmed")
+      return res.status(400).json({ message: "Cannot cancel a confirmed booking" });
+
+    if (b.status === "cancelled")
+      return res.status(400).json({ message: "Booking already cancelled" });
+
+    b.status = "cancelled";
+    await b.save();
+
+    res.json({ success: true, booking: b });
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Failed to cancel booking" });
+  }
+});
+
+/** Lister: bookings for my vehicles */
+router.get("/for-my-vehicles", auth("lister"), async (req, res) => {
+  try {
+    const list = await Booking.find()
+      .populate({
+        path: "motorcycle",
+        match: { owner: req.user.id },
+      })
+      .populate("user", "name email");
+    res.json(list.filter((x) => x.motorcycle));
+  } catch (e) {
+    res.status(500).json({ message: e.message || "Unable to fetch bookings" });
   }
 });
 

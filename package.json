@@ -1,28 +1,20 @@
 {
   "name": "motorcycle-service-booking-backend",
   "version": "1.0.0",
+  "description": "Backend API for Motorcycle Service Booking (auth, roles, bookings, payments, reviews).",
   "main": "index.js",
   "type": "module",
-  "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
-  },
+  "scripts": { "start": "node index.js", "dev": "nodemon index.js" },
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^4.21.2",
-    "express-validator": "^7.2.1",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^7.8.7",
     "morgan": "^1.10.1",
-    "stripe": "^18.4.0"
+    "razorpay": "^2.9.6"
   },
-  "devDependencies": {
-    "nodemon": "^3.1.10"
-  },
-  "description": "This is the backend API for the Motorcycle Service Booking web application, built with Node.js, Express, and MongoDB. It handles booking submissions and retrieves booking data for charting.",
-  "keywords": [],
-  "author": "",
+  "devDependencies": { "nodemon": "^3.1.10" },
   "license": "ISC"
 }

@@ -1,52 +1,74 @@
+// index.js
+import dotenv from "dotenv";
+dotenv.config(); // ✅ load env BEFORE anything else
+
 import express from "express";
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 import cors from "cors";
-
-import authRoutes from "./routes/auth.js";
-
-dotenv.config(); // Load .env
+import morgan from "morgan";
 
 const app = express();
 
-// ✅ Allowed origins from .env
+/* ---------- CORS ---------- */
 const allowedOrigins = [
-  process.env.CLIENT_URL || "http://localhost:3000",
-  process.env.CLIENT_URL_PROD || "https://whimsical-froyo-e74491.netlify.app",
-];
+  process.env.CLIENT_URL || "http://localhost:3000",        // CRA
+  process.env.CLIENT_URL_VITE || "http://localhost:5173",   // Vite
+  process.env.CLIENT_URL_PROD || ""                         // Netlify
+].filter(Boolean);
 
-// Middleware
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
+    origin: (origin, cb) =>
+      !origin || allowedOrigins.includes(origin)
+        ? cb(null, true)
+        : cb(new Error("CORS blocked")),
+    credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
   })
 );
 
 app.use(express.json());
+app.use(morgan("dev"));
 
-// MongoDB Connection
+/* ---------- DB ---------- */
 mongoose
-  .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log("✅ MongoDB connected");
+    app.listen(process.env.PORT || 5000, () =>
+      console.log(`🚀 API running on ${process.env.PORT || 5000}`)
+    );
   })
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.error("❌ MongoDB connection error:", err));
+  .catch((err) => console.error("❌ Mongo error:", err.message));
 
-// Routes
+/* ---------- Health ---------- */
+app.get("/", (_req, res) => res.send("API running 🚀"));
+
+/* ---------- Routes (import AFTER env is loaded) ---------- */
+// Top-level await ensures env vars are available to route modules at load time
+const { default: authRoutes } = await import("./routes/auth.js");
+const { default: motorcyclesRoutes } = await import("./routes/motorcycles.js");
+const { default: bookingsRoutes } = await import("./routes/bookings.js");
+const { default: paymentsRoutes } = await import("./routes/payments.js");
+const { default: reviewsRoutes } = await import("./routes/reviews.js");
+
 app.use("/api/auth", authRoutes);
+app.use("/api/motorcycles", motorcyclesRoutes);
+app.use("/api/bookings", bookingsRoutes);
+app.use("/api/payments", paymentsRoutes);
+app.use("/api/reviews", reviewsRoutes);
 
-// Test API
-app.get("/", (req, res) => res.send("API running 🚀"));
+/* ---------- Global error handler ---------- */
+app.use((err, _req, res, _next) => {
+  console.error("❌ Error:", err);
+  res.status(err.status || 500).json({ message: err?.message || "Server error" });
+});
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+/* ---------- Process-level safety nets ---------- */
+process.on("unhandledRejection", (reason) => {
+  console.error("🔴 UnhandledRejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("🔴 UncaughtException:", err);
+});
