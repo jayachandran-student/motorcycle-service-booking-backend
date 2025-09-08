@@ -1,4 +1,3 @@
-// index.js
 import dotenv from "dotenv";
 dotenv.config(); // load env first
 
@@ -13,7 +12,8 @@ const app = express();
 const allowListExact = [
   process.env.CLIENT_URL,        // http://localhost:3000
   process.env.CLIENT_URL_VITE,   // http://localhost:5173
-  process.env.CLIENT_URL_PROD,   // e.g. https://motorcyclebook.netlify.app  (no trailing slash)
+  process.env.CLIENT_URL_PROD,   // e.g. https://motorcyclebook.netlify.app
+  process.env.REACT_APP_API_BASE // Netlify / CRA env var 
 ].filter(Boolean);
 
 // Generic patterns we allow
