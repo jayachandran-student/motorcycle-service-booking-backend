@@ -4,9 +4,13 @@
   "description": "Backend API for Motorcycle Service Booking (auth, roles, bookings, payments, reviews).",
   "main": "index.js",
   "type": "module",
-  "scripts": { "start": "node index.js", "dev": "nodemon index.js" },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
   "dependencies": {
     "bcryptjs": "^3.0.2",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^4.21.2",
@@ -15,6 +19,8 @@
     "morgan": "^1.10.1",
     "razorpay": "^2.9.6"
   },
-  "devDependencies": { "nodemon": "^3.1.10" },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  },
   "license": "ISC"
 }
