@@ -1,97 +1,78 @@
-// index.js
 import dotenv from "dotenv";
-dotenv.config();
+dotenv.config(); // load env first
 
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import morgan from "morgan";
-import cookieParser from "cookie-parser"; // helpful to parse cookies in requests
 
 const app = express();
 
-
+/* ---------- CORS (robust + preflight-safe) ---------- */
 const allowListExact = [
-  process.env.CLIENT_URL,       // e.g. http://localhost:3000
-  process.env.CLIENT_URL_VITE,  // e.g. http://localhost:5173
-  process.env.CLIENT_URL_PROD   // e.g. https://motorcyclebookingapp.netlify.app
+  process.env.CLIENT_URL,        // http://localhost:3000
+  process.env.CLIENT_URL_VITE,   // http://localhost:5173
+  process.env.CLIENT_URL_PROD,   // e.g. https://motorcyclebook.netlify.app
+  process.env.REACT_APP_API_BASE // Netlify / CRA env var 
 ].filter(Boolean);
 
+// Generic patterns we allow
 const localhostRx = /^http:\/\/localhost(:\d+)?$/i;
 const loopbackRx  = /^https?:\/\/127\.0\.0\.1(:\d+)?$/i;
+// Optional convenience: allow any Netlify subdomain (remove if you want only exact site)
 const netlifyRx   = /^https:\/\/[a-z0-9-]+\.netlify\.app$/i;
 
-function norm(u) {
-  return (u || "").replace(/\/+$/, "").toLowerCase();
-}
+// Normalize URL for case/ending-slash-insensitive compare
+const norm = (u) => (u || "").replace(/\/+$/, "").toLowerCase();
 
-// small debug - optional
-app.use((req, res, next) => {
-  res.setHeader("X-CORS-Debug", "1");
-  next();
-});
+app.use(
+  cors({
+    origin(origin, cb) {
+      // Debug log (comment out once stable)
+      console.log("CORS: request Origin =", origin);
 
-app.use((req, res, next) => {
-  const origin = req.get("Origin");
-  console.log("CORS: incoming origin =", origin);
+      // No Origin -> curl/Postman/server-to-server; allow
+      if (!origin) return cb(null, true);
 
-  if (!origin) {
-    // non-browser clients (curl/postman)
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Vary", "Origin");
-    return next();
-  }
+      // Local contexts
+      if (origin.startsWith("file://")) return cb(null, true);
+      if (localhostRx.test(origin) || loopbackRx.test(origin)) return cb(null, true);
 
-  // file:// or local dev
-  if (origin.startsWith("file://") || localhostRx.test(origin) || loopbackRx.test(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Vary", "Origin");
-    return next();
-  }
+      // Any *.netlify.app (handy during site renames)
+      if (netlifyRx.test(origin)) return cb(null, true);
 
-  // allow any netlify subdomain
-  if (netlifyRx.test(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Vary", "Origin");
-    return next();
-  }
+      // Exact allow list from env
+      const ok = allowListExact.some((u) => norm(u) === norm(origin));
+      if (ok) return cb(null, true);
 
-  // exact env list match
-  const ok = allowListExact.some((u) => norm(u) === norm(origin));
-  if (ok) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Vary", "Origin");
-    return next();
-  }
+      console.warn("CORS blocked for origin:", origin);
+      return cb(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
-  console.warn("CORS: blocked origin:", origin);
-  res.setHeader("Vary", "Origin");
-  return res.status(403).json({ message: "CORS blocked for origin" });
-});
-
-// central preflight answer
+// Always answer preflights cleanly with the needed headers
 app.options("*", (req, res) => {
-  const origin = req.get("Origin") || "*";
-  res.setHeader("Access-Control-Allow-Origin", origin);
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,PATCH,OPTIONS");
-  res.setHeader("Vary", "Origin");
+  const origin = req.get("Origin");
+  if (origin) res.set("Access-Control-Allow-Origin", origin);
+  else res.set("Access-Control-Allow-Origin", "*");
+  res.set("Vary", "Origin");
+  res.set("Access-Control-Allow-Credentials", "true");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,PATCH,OPTIONS");
   return res.sendStatus(204);
 });
 
-/* ---------- Standard middleware ---------- */
 app.use(express.json());
-app.use(cookieParser());
 if (process.env.NODE_ENV !== "production") app.use(morgan("dev"));
 
 /* ---------- Health ---------- */
 app.get("/", (_req, res) => res.send("API running 🚀"));
 
-/* ---------- Routes (import AFTER env loaded) ---------- */
+/* ---------- Routes (import AFTER env is loaded) ---------- */
 const { default: authRoutes } = await import("./routes/auth.js");
 const { default: motorcyclesRoutes } = await import("./routes/motorcycles.js");
 const { default: bookingsRoutes } = await import("./routes/bookings.js");
