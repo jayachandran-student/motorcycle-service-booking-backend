@@ -5,29 +5,41 @@ import { auth } from "../middleware/auth.js";
 
 const router = express.Router();
 
-/** Create a booking (initially "pending") */
+/** Create a booking */
 router.post("/", auth("taker"), async (req, res) => {
   try {
-    const { motorcycleId, startDate, endDate, totalPrice, orderId } = req.body;
+    const { motorcycleId, startDate, endDate } = req.body;
+    if (!motorcycleId || !startDate || !endDate) {
+      return res.status(400).json({ message: "motorcycleId, startDate, and endDate required" });
+    }
 
     const mc = await Motorcycle.findById(motorcycleId);
     if (!mc) return res.status(404).json({ message: "Motorcycle not found" });
 
+    const s = new Date(startDate);
+    const e = new Date(endDate);
+    if (isNaN(s) || isNaN(e)) return res.status(400).json({ message: "Invalid dates" });
+    if (e <= s) return res.status(400).json({ message: "endDate must be after startDate" });
+
+    const days = Math.ceil((e - s) / (1000 * 60 * 60 * 24));
+    const totalPrice = (mc.rentPerDay || 0) * days;
+
     const booking = await Booking.create({
       user: req.user.id,
       motorcycle: mc._id,
-      startDate,
-      endDate,
+      startDate: s,
+      endDate: e,
       totalPrice,
-      orderId,
       status: "pending",
     });
 
-    res.json(booking);
+    res.status(201).json(booking);
   } catch (e) {
+    console.error("Booking error:", e.message);
     res.status(500).json({ message: e.message || "Unable to create booking" });
   }
 });
+
 
 /** Get current user's bookings (taker) */
 router.get("/mine", auth("taker"), async (req, res) => {
