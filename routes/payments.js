@@ -1,4 +1,3 @@
-// routes/payments.js
 import express from "express";
 import Razorpay from "razorpay";
 import crypto from "crypto";
@@ -114,4 +113,18 @@ router.post("/verify", auth("taker"), async (req, res) => {
       user: req.user.id,
     });
 
-    if (!b) return res.s
+    if (!b) return res.status(404).json({ message: "Booking not found" });
+
+    b.status = "confirmed";
+    b.paymentId = razorpay_payment_id;
+    await b.save();
+
+    console.log("[payments] booking confirmed:", b._id);
+    return res.json({ success: true, booking: b });
+  } catch (err) {
+    console.error("[payments] verify error:", err?.message || err);
+    return res.status(500).json({ message: err.message || "Verification failed" });
+  }
+});
+
+export default router;
