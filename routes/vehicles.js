@@ -118,16 +118,22 @@ router.delete("/:id", auth("lister"), async (req, res) => {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid id" });
 
+    // find the vehicle to check ownership
     const vehicle = await Vehicle.findById(id);
     if (!vehicle) return res.status(404).json({ message: "Vehicle not found" });
+
+    // only owner can delete
     if (vehicle.owner.toString() !== req.user.id.toString()) return res.status(403).json({ message: "Forbidden" });
 
-    await vehicle.remove();
+    // delete by id (safer than calling .remove() on the object in some environments)
+    await Vehicle.findByIdAndDelete(id);
+
     return res.json({ success: true });
   } catch (e) {
     console.error("Delete vehicle error:", e);
     return res.status(500).json({ message: e?.message || "Unable to delete vehicle" });
   }
 });
+
 
 export default router;
