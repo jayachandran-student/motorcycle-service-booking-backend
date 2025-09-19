@@ -1,4 +1,3 @@
-// routes/bookings.js
 import express from "express";
 import Booking from "../models/Booking.js";
 import Motorcycle from "../models/Motorcycle.js";
